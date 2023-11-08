@@ -1,1 +1,3 @@
-# Hand-in4
+# Distributed Mutual Exclusion
+## Running the application
+### Client

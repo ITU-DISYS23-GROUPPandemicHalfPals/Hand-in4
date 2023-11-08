@@ -1,0 +1,5 @@
+syntax = "proto3";
+
+package mutualExclusion;
+
+option go_package = "mutualExclusion/mutualExclusion";
