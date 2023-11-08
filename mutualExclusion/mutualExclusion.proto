@@ -3,3 +3,18 @@ syntax = "proto3";
 package mutualExclusion;
 
 option go_package = "mutualExclusion/mutualExclusion";
+
+message ElectionMessage {
+    int32 id = 1;
+}
+
+message CoordinatorMessage {
+    int32 id = 1;
+}
+
+message Response { }
+
+service MutualExclusion {
+    rpc Election(ElectionMessage) returns (Response) {}
+    rpc Coordinator(CoordinatorMessage) returns (Response) {}
+}
