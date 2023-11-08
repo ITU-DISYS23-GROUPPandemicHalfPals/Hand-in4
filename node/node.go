@@ -2,7 +2,12 @@ package main
 
 import (
 	"flag"
+	"log"
 	"mutualExclusion/mutualExclusion"
+	"net"
+	"strconv"
+
+	"google.golang.org/grpc"
 )
 
 var name = flag.String("name", "John Doe", "The name of the node")
@@ -17,6 +22,7 @@ type node struct {
 
 	Elections    chan *mutualExclusion.ElectionMessage
 	Coordinators chan *mutualExclusion.CoordinatorMessage
+	mutualExclusion.UnimplementedMutualExclusionServer
 }
 
 func Node(name string, id int, port int) *node {
@@ -46,15 +52,23 @@ func main() {
 
 	n := Node(*name, *id, *port)
 
-	println(n.Name)
-	println(n.Id)
-	println(n.Port)
-
 	go n.server()
 	n.client()
 }
 
 func (n *node) server() {
+	server := grpc.NewServer()
+	mutualExclusion.RegisterMutualExclusionServer(server, n)
+
+	listener, error := net.Listen("tcp", ":"+strconv.Itoa(n.Port))
+	if error != nil {
+		log.Fatalf("Failed to listen: %s", error)
+	}
+
+	error = server.Serve(listener)
+	if error != nil {
+		log.Fatalf("Failed to serve: %s", error)
+	}
 
 }
 
