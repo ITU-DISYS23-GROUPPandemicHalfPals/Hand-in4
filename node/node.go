@@ -19,12 +19,12 @@ var name = flag.String("name", "John Doe", "The name of the node")
 var port = flag.Int("port", 5000, "The port of the node")
 
 type node struct {
-	Name  string
-	Port  int
-	Ports []int
+	Name            string
+	Port            int
+	CoordinatorPort int
+	Ports           []int
 
 	Elections     chan *me.ElectionMessage
-	Coordinators  chan *me.CoordinatorMessage
 	Clients       map[int]me.MutualExclusionClient
 	BiggerClients map[int]me.MutualExclusionClient
 	me.UnimplementedMutualExclusionServer
@@ -46,8 +46,7 @@ func Node(name string, port int) *node {
 		Port:  port,
 		Ports: ports,
 
-		Elections:     make(chan *me.ElectionMessage, 100),
-		Coordinators:  make(chan *me.CoordinatorMessage, 100),
+		Elections:     make(chan *me.ElectionMessage, 10),
 		Clients:       make(map[int]me.MutualExclusionClient),
 		BiggerClients: make(map[int]me.MutualExclusionClient),
 	}
@@ -100,6 +99,7 @@ func (n *node) send(ctx context.Context) {
 			}
 
 			for _, client := range n.BiggerClients {
+				ctx, cancel := context.WithTimeout(ctx, time.Second)
 				_, error := client.Election(ctx, electionMessage)
 
 				if error != nil {
@@ -107,15 +107,15 @@ func (n *node) send(ctx context.Context) {
 				} else {
 					log.Println("Success")
 				}
+
+				cancel()
 			}
 		}
 	}
 }
 
 func (n *node) dialServers() {
-	count := len(n.Ports)
-
-	for count > 0 {
+	for {
 		time.Sleep(time.Second)
 
 		for _, port := range n.Ports {
@@ -130,7 +130,8 @@ func (n *node) dialServers() {
 				continue
 			}
 
-			count--
+			log.Printf("Added %d", port)
+
 			client := me.NewMutualExclusionClient(connection)
 
 			n.Clients[port] = client
