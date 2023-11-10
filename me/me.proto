@@ -5,11 +5,11 @@ package me;
 option go_package = "me/me";
 
 message ElectionMessage {
-    int32 id = 1;
+    int32 port = 1;
 }
 
 message CoordinatorMessage {
-    int32 id = 1;
+    int32 port = 1;
 }
 
 message Response { }

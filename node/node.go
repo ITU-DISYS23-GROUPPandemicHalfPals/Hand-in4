@@ -1,32 +1,36 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"flag"
 	"log"
 	"me/me"
 	"net"
+	"os"
 	"strconv"
+	"time"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 var name = flag.String("name", "John Doe", "The name of the node")
-var id = flag.Int("id", 1, "The id of the node")
 var port = flag.Int("port", 5000, "The port of the node")
 
 type node struct {
 	Name  string
-	Id    int
 	Port  int
 	Ports []int
 
-	Elections    chan *me.ElectionMessage
-	Coordinators chan *me.CoordinatorMessage
+	Elections     chan *me.ElectionMessage
+	Coordinators  chan *me.CoordinatorMessage
+	Clients       map[int]me.MutualExclusionClient
+	BiggerClients map[int]me.MutualExclusionClient
 	me.UnimplementedMutualExclusionServer
 }
 
-func Node(name string, id int, port int) *node {
+func Node(name string, port int) *node {
 	var ports []int
 
 	for i := 5000; i <= 5002; i++ {
@@ -39,19 +43,20 @@ func Node(name string, id int, port int) *node {
 
 	return &node{
 		Name:  name,
-		Id:    id,
 		Port:  port,
 		Ports: ports,
 
-		Elections:    make(chan *me.ElectionMessage, 100),
-		Coordinators: make(chan *me.CoordinatorMessage, 100),
+		Elections:     make(chan *me.ElectionMessage, 100),
+		Coordinators:  make(chan *me.CoordinatorMessage, 100),
+		Clients:       make(map[int]me.MutualExclusionClient),
+		BiggerClients: make(map[int]me.MutualExclusionClient),
 	}
 }
 
 func main() {
 	flag.Parse()
 
-	n := Node(*name, *id, *port)
+	n := Node(*name, *port)
 
 	go n.server()
 	n.client()
@@ -70,17 +75,69 @@ func (n *node) server() {
 	if error != nil {
 		log.Fatalf("Failed to serve: %s", error)
 	}
-
 }
 
 func (n *node) Election(_ context.Context, request *me.ElectionMessage) (*me.Response, error) {
+	log.Println(request.Port)
 
-}
-
-func (n *node) Coordinator(_ context.Context, request *me.CoordinatorMessage) (*me.Response, error) {
-
+	return &me.Response{}, nil
 }
 
 func (n *node) client() {
+	ctx := context.Background()
 
+	go n.dialServers()
+	n.send(ctx)
+}
+
+func (n *node) send(ctx context.Context) {
+	scanner := bufio.NewScanner(os.Stdin)
+
+	for {
+		if scanner.Scan() {
+			electionMessage := &me.ElectionMessage{
+				Port: int32(n.Port),
+			}
+
+			for _, client := range n.BiggerClients {
+				_, error := client.Election(ctx, electionMessage)
+
+				if error != nil {
+					log.Println(error)
+				} else {
+					log.Println("Success")
+				}
+			}
+		}
+	}
+}
+
+func (n *node) dialServers() {
+	count := len(n.Ports)
+
+	for count > 0 {
+		time.Sleep(time.Second)
+
+		for _, port := range n.Ports {
+			_, ok := n.Clients[port]
+
+			if ok {
+				continue
+			}
+
+			connection, error := grpc.Dial(":"+strconv.Itoa(port), grpc.WithTransportCredentials(insecure.NewCredentials()))
+			if error != nil {
+				continue
+			}
+
+			count--
+			client := me.NewMutualExclusionClient(connection)
+
+			n.Clients[port] = client
+
+			if port > n.Port {
+				n.BiggerClients[port] = client
+			}
+		}
+	}
 }
