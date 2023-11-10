@@ -1,4 +1,4 @@
-module mutualExclusion
+module me
 
 go 1.21.0
 

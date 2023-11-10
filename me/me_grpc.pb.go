@@ -2,9 +2,9 @@
 // versions:
 // - protoc-gen-go-grpc v1.3.0
 // - protoc             v4.25.0--rc2
-// source: mutualExclusion.proto
+// source: me.proto
 
-package mutualExclusion
+package me
 
 import (
 	context "context"
@@ -19,8 +19,8 @@ import (
 const _ = grpc.SupportPackageIsVersion7
 
 const (
-	MutualExclusion_Election_FullMethodName    = "/mutualExclusion.MutualExclusion/Election"
-	MutualExclusion_Coordinator_FullMethodName = "/mutualExclusion.MutualExclusion/Coordinator"
+	MutualExclusion_Election_FullMethodName    = "/me.MutualExclusion/Election"
+	MutualExclusion_Coordinator_FullMethodName = "/me.MutualExclusion/Coordinator"
 )
 
 // MutualExclusionClient is the client API for MutualExclusion service.
@@ -129,7 +129,7 @@ func _MutualExclusion_Coordinator_Handler(srv interface{}, ctx context.Context, 
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
 var MutualExclusion_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "mutualExclusion.MutualExclusion",
+	ServiceName: "me.MutualExclusion",
 	HandlerType: (*MutualExclusionServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
@@ -142,5 +142,5 @@ var MutualExclusion_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "mutualExclusion.proto",
+	Metadata: "me.proto",
 }

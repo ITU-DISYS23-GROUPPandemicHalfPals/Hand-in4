@@ -1,9 +1,10 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"log"
-	"mutualExclusion/mutualExclusion"
+	"me/me"
 	"net"
 	"strconv"
 
@@ -20,9 +21,9 @@ type node struct {
 	Port  int
 	Ports []int
 
-	Elections    chan *mutualExclusion.ElectionMessage
-	Coordinators chan *mutualExclusion.CoordinatorMessage
-	mutualExclusion.UnimplementedMutualExclusionServer
+	Elections    chan *me.ElectionMessage
+	Coordinators chan *me.CoordinatorMessage
+	me.UnimplementedMutualExclusionServer
 }
 
 func Node(name string, id int, port int) *node {
@@ -42,8 +43,8 @@ func Node(name string, id int, port int) *node {
 		Port:  port,
 		Ports: ports,
 
-		Elections:    make(chan *mutualExclusion.ElectionMessage, 100),
-		Coordinators: make(chan *mutualExclusion.CoordinatorMessage, 100),
+		Elections:    make(chan *me.ElectionMessage, 100),
+		Coordinators: make(chan *me.CoordinatorMessage, 100),
 	}
 }
 
@@ -58,7 +59,7 @@ func main() {
 
 func (n *node) server() {
 	server := grpc.NewServer()
-	mutualExclusion.RegisterMutualExclusionServer(server, n)
+	me.RegisterMutualExclusionServer(server, n)
 
 	listener, error := net.Listen("tcp", ":"+strconv.Itoa(n.Port))
 	if error != nil {
@@ -69,6 +70,14 @@ func (n *node) server() {
 	if error != nil {
 		log.Fatalf("Failed to serve: %s", error)
 	}
+
+}
+
+func (n *node) Election(_ context.Context, request *me.ElectionMessage) (*me.Response, error) {
+
+}
+
+func (n *node) Coordinator(_ context.Context, request *me.CoordinatorMessage) (*me.Response, error) {
 
 }
 

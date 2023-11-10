@@ -1,8 +1,8 @@
 syntax = "proto3";
 
-package mutualExclusion;
+package me;
 
-option go_package = "mutualExclusion/mutualExclusion";
+option go_package = "me/me";
 
 message ElectionMessage {
     int32 id = 1;
