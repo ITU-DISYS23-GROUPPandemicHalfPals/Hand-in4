@@ -77,7 +77,15 @@ func (n *node) server() {
 }
 
 func (n *node) Election(_ context.Context, request *me.ElectionMessage) (*me.Response, error) {
-	log.Println(request.Port)
+	log.Printf("%d requested election", request.Port)
+
+	n.Elections <- request
+
+	return &me.Response{}, nil
+}
+
+func (n *node) Coordinator(_ context.Context, request *me.CoordinatorMessage) (*me.Response, error) {
+	n.CoordinatorPort = int(request.Port)
 
 	return &me.Response{}, nil
 }
@@ -86,10 +94,11 @@ func (n *node) client() {
 	ctx := context.Background()
 
 	go n.dialServers()
-	n.send(ctx)
+	go n.broadcaseElection(ctx)
+	n.startElection(ctx)
 }
 
-func (n *node) send(ctx context.Context) {
+func (n *node) startElection(ctx context.Context) {
 	scanner := bufio.NewScanner(os.Stdin)
 
 	for {
@@ -98,18 +107,62 @@ func (n *node) send(ctx context.Context) {
 				Port: int32(n.Port),
 			}
 
+			response := false
 			for _, client := range n.BiggerClients {
 				ctx, cancel := context.WithTimeout(ctx, time.Second)
 				_, error := client.Election(ctx, electionMessage)
 
-				if error != nil {
-					log.Println(error)
-				} else {
-					log.Println("Success")
+				if error == nil {
+					response = true
 				}
 
 				cancel()
 			}
+
+			if !response {
+				coordinatorMessage := &me.CoordinatorMessage{
+					Port: int32(n.Port),
+				}
+
+				for _, client := range n.Clients {
+					ctx, cancel := context.WithTimeout(ctx, time.Second)
+					_, _ = client.Coordinator(ctx, coordinatorMessage)
+					cancel()
+				}
+
+				log.Printf("%d is coordinator", n.Port)
+			}
+		}
+	}
+}
+
+func (n *node) broadcaseElection(ctx context.Context) {
+	for {
+		election := <-n.Elections
+		response := false
+		for _, client := range n.BiggerClients {
+			ctx, cancel := context.WithTimeout(ctx, time.Second)
+			_, error := client.Election(ctx, election)
+
+			if error == nil {
+				response = true
+			}
+
+			cancel()
+		}
+
+		if !response {
+			coordinatorMessage := &me.CoordinatorMessage{
+				Port: int32(n.Port),
+			}
+
+			for _, client := range n.Clients {
+				ctx, cancel := context.WithTimeout(ctx, time.Second)
+				_, _ = client.Coordinator(ctx, coordinatorMessage)
+				cancel()
+			}
+
+			log.Printf("%d is coordinator", n.Port)
 		}
 	}
 }
@@ -129,8 +182,6 @@ func (n *node) dialServers() {
 			if error != nil {
 				continue
 			}
-
-			log.Printf("Added %d", port)
 
 			client := me.NewMutualExclusionClient(connection)
 
