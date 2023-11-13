@@ -1,13 +1,11 @@
 package main
 
 import (
-	"bufio"
 	"context"
 	"flag"
 	"log"
 	"me/me"
 	"net"
-	"os"
 	"strconv"
 	"time"
 
@@ -93,89 +91,8 @@ func (n *node) Coordinator(_ context.Context, request *me.CoordinatorMessage) (*
 func (n *node) client() {
 	ctx := context.Background()
 
-	go n.printCoordinator()
-	go n.dialServers()
 	go n.broadcaseElection(ctx)
-	n.startElection(ctx)
-}
-
-func (n *node) printCoordinator() {
-	for {
-		time.Sleep(time.Second * 5)
-
-		if n.CoordinatorPort != 0 {
-			log.Printf("Coordinator is %d", n.CoordinatorPort)
-		}
-	}
-}
-
-func (n *node) startElection(ctx context.Context) {
-	scanner := bufio.NewScanner(os.Stdin)
-
-	for {
-		if scanner.Scan() {
-			electionMessage := &me.ElectionMessage{
-				Port: int32(n.Port),
-			}
-
-			response := false
-			for _, client := range n.BiggerClients {
-				ctx, cancel := context.WithTimeout(ctx, time.Second)
-				_, error := client.Election(ctx, electionMessage)
-
-				if error == nil {
-					response = true
-				}
-
-				cancel()
-			}
-
-			if !response {
-				coordinatorMessage := &me.CoordinatorMessage{
-					Port: int32(n.Port),
-				}
-
-				for _, client := range n.Clients {
-					ctx, cancel := context.WithTimeout(ctx, time.Second)
-					_, _ = client.Coordinator(ctx, coordinatorMessage)
-					cancel()
-				}
-
-				n.CoordinatorPort = int(n.Port)
-			}
-		}
-	}
-}
-
-func (n *node) broadcaseElection(ctx context.Context) {
-	for {
-		election := <-n.Elections
-		response := false
-		for _, client := range n.BiggerClients {
-			ctx, cancel := context.WithTimeout(ctx, time.Second)
-			_, error := client.Election(ctx, election)
-
-			if error == nil {
-				response = true
-			}
-
-			cancel()
-		}
-
-		if !response {
-			coordinatorMessage := &me.CoordinatorMessage{
-				Port: int32(n.Port),
-			}
-
-			for _, client := range n.Clients {
-				ctx, cancel := context.WithTimeout(ctx, time.Second)
-				_, _ = client.Coordinator(ctx, coordinatorMessage)
-				cancel()
-			}
-
-			n.CoordinatorPort = int(n.Port)
-		}
-	}
+	go n.dialServers()
 }
 
 func (n *node) dialServers() {
@@ -202,5 +119,44 @@ func (n *node) dialServers() {
 				n.BiggerClients[port] = client
 			}
 		}
+	}
+}
+
+func (n *node) broadcaseElection(ctx context.Context) {
+	for {
+		<-n.Elections
+		n.startElection(ctx)
+	}
+}
+
+func (n *node) startElection(ctx context.Context) {
+	electionMessage := &me.ElectionMessage{
+		Port: int32(n.Port),
+	}
+
+	response := false
+	for _, client := range n.BiggerClients {
+		ctx, cancel := context.WithTimeout(ctx, time.Second)
+		_, error := client.Election(ctx, electionMessage)
+
+		if error == nil {
+			response = true
+		}
+
+		cancel()
+	}
+
+	if !response {
+		coordinatorMessage := &me.CoordinatorMessage{
+			Port: int32(n.Port),
+		}
+
+		for _, client := range n.Clients {
+			ctx, cancel := context.WithTimeout(ctx, time.Second)
+			_, _ = client.Coordinator(ctx, coordinatorMessage)
+			cancel()
+		}
+
+		n.CoordinatorPort = int(n.Port)
 	}
 }
