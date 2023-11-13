@@ -213,6 +213,8 @@ func (n *node) run(ctx context.Context) {
 			continue
 		}
 
+		println()
+		log.Printf("Requesting the token - Using Coordinator: %d", n.CoordinatorPort)
 		tokenRequest := &me.TokenRequest{
 			Port: int32(n.Port),
 		}
@@ -226,9 +228,9 @@ func (n *node) run(ctx context.Context) {
 		}
 
 		n.Token = <-n.TokenChannel
+		log.Print("Granted token")
 
-		println()
-		log.Printf("Entering critical section - Coordinator: %d", n.CoordinatorPort)
+		log.Print("Entering critical section")
 
 		n.criticalSection()
 
@@ -236,6 +238,7 @@ func (n *node) run(ctx context.Context) {
 
 		n.Token = false
 		client.ReleaseToken(ctx, &me.TokenMessage{})
+		log.Print("Released token")
 
 		n.sleep()
 	}
