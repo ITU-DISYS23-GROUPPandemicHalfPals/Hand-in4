@@ -93,9 +93,20 @@ func (n *node) Coordinator(_ context.Context, request *me.CoordinatorMessage) (*
 func (n *node) client() {
 	ctx := context.Background()
 
+	go n.printCoordinator()
 	go n.dialServers()
 	go n.broadcaseElection(ctx)
 	n.startElection(ctx)
+}
+
+func (n *node) printCoordinator() {
+	for {
+		time.Sleep(time.Second * 5)
+
+		if n.CoordinatorPort != 0 {
+			log.Printf("Coordinator is %d", n.CoordinatorPort)
+		}
+	}
 }
 
 func (n *node) startElection(ctx context.Context) {
