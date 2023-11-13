@@ -91,7 +91,7 @@ func (n *node) Coordinator(_ context.Context, request *me.CoordinatorMessage) (*
 func (n *node) client() {
 	ctx := context.Background()
 
-	go n.broadcaseElection(ctx)
+	go n.broadcastElection(ctx)
 	go n.dialServers()
 }
 
@@ -122,7 +122,7 @@ func (n *node) dialServers() {
 	}
 }
 
-func (n *node) broadcaseElection(ctx context.Context) {
+func (n *node) broadcastElection(ctx context.Context) {
 	for {
 		<-n.Elections
 		n.startElection(ctx)
