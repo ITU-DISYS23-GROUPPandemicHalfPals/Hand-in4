@@ -222,11 +222,11 @@ func (n *node) run(ctx context.Context) {
 
 		n.Token = <-n.TokenChannel
 
-		log.Print("Entering critical section")
+		log.Print("Entered critical section")
 
 		n.criticalSection()
 
-		log.Printf("Leaving critical section")
+		log.Printf("Left critical section")
 
 		n.Token = false
 		client.ReleaseToken(ctx, &me.TokenMessage{})
@@ -241,7 +241,7 @@ func (n *node) sleep() {
 }
 
 func (n *node) criticalSection() {
-	time.Sleep(time.Second * 3)
-	log.Printf("I am inside the critical section")
-	time.Sleep(time.Second * 3)
+	time.Sleep(time.Second * 5)
+	log.Printf("Using the critical section")
+	time.Sleep(time.Second * 5)
 }
