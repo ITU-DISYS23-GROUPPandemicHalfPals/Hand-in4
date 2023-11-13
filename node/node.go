@@ -77,9 +77,9 @@ func (n *node) server() {
 }
 
 func (n *node) Election(_ context.Context, request *me.ElectionMessage) (*me.Response, error) {
-	log.Printf("%d requested election", request.Port)
-
-	n.Elections <- request
+	n.Elections <- &me.ElectionMessage{
+		Port: int32(n.Port),
+	}
 
 	return &me.Response{}, nil
 }
@@ -130,6 +130,7 @@ func (n *node) startElection(ctx context.Context) {
 					cancel()
 				}
 
+				n.CoordinatorPort = int(n.Port)
 				log.Printf("%d is coordinator", n.Port)
 			}
 		}
@@ -162,7 +163,7 @@ func (n *node) broadcaseElection(ctx context.Context) {
 				cancel()
 			}
 
-			log.Printf("%d is coordinator", n.Port)
+			n.CoordinatorPort = int(n.Port)
 		}
 	}
 }
