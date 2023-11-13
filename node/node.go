@@ -40,9 +40,10 @@ func Node(name string, port int) *node {
 	}
 
 	return &node{
-		Name:  name,
-		Port:  port,
-		Ports: ports,
+		Name:            name,
+		Port:            port,
+		CoordinatorPort: 0,
+		Ports:           ports,
 
 		Elections:     make(chan *me.ElectionMessage, 10),
 		Clients:       make(map[int]me.MutualExclusionClient),
