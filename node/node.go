@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"log"
+	"math/rand"
 	"me/me"
 	"net"
 	"strconv"
@@ -13,39 +14,45 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
-var name = flag.String("name", "John Doe", "The name of the node")
 var port = flag.Int("port", 5000, "The port of the node")
 
 type node struct {
-	Name            string
 	Port            int
 	CoordinatorPort int
 	Ports           []int
 
-	Elections     chan *me.ElectionMessage
+	Token            bool
+	CoordinatorToken bool
+
+	TokenRequestChannel chan int
+	TokenChannel        chan bool
+	ElectionChannel     chan bool
+
 	Clients       map[int]me.MutualExclusionClient
 	BiggerClients map[int]me.MutualExclusionClient
+
 	me.UnimplementedMutualExclusionServer
 }
 
-func Node(name string, port int) *node {
+func Node(port int) *node {
 	var ports []int
 
 	for i := 5000; i <= 5002; i++ {
-		if i == port {
-			continue
-		}
-
 		ports = append(ports, i)
 	}
 
 	return &node{
-		Name:            name,
 		Port:            port,
 		CoordinatorPort: 0,
 		Ports:           ports,
 
-		Elections:     make(chan *me.ElectionMessage, 10),
+		Token:            false,
+		CoordinatorToken: false,
+
+		TokenRequestChannel: make(chan int, 10),
+		TokenChannel:        make(chan bool, 1),
+		ElectionChannel:     make(chan bool, 10),
+
 		Clients:       make(map[int]me.MutualExclusionClient),
 		BiggerClients: make(map[int]me.MutualExclusionClient),
 	}
@@ -54,13 +61,15 @@ func Node(name string, port int) *node {
 func main() {
 	flag.Parse()
 
-	n := Node(*name, *port)
+	n := Node(*port)
 
-	go n.server()
-	n.client()
+	ctx := context.Background()
+
+	go n.server(ctx)
+	n.client(ctx)
 }
 
-func (n *node) server() {
+func (n *node) server(ctx context.Context) {
 	server := grpc.NewServer()
 	me.RegisterMutualExclusionServer(server, n)
 
@@ -76,9 +85,7 @@ func (n *node) server() {
 }
 
 func (n *node) Election(_ context.Context, request *me.ElectionMessage) (*me.Response, error) {
-	n.Elections <- &me.ElectionMessage{
-		Port: int32(n.Port),
-	}
+	n.ElectionChannel <- true
 
 	return &me.Response{}, nil
 }
@@ -86,14 +93,40 @@ func (n *node) Election(_ context.Context, request *me.ElectionMessage) (*me.Res
 func (n *node) Coordinator(_ context.Context, request *me.CoordinatorMessage) (*me.Response, error) {
 	n.CoordinatorPort = int(request.Port)
 
+	if n.CoordinatorPort == n.Port {
+		n.CoordinatorToken = true
+	} else {
+		n.CoordinatorToken = false
+	}
+
 	return &me.Response{}, nil
 }
 
-func (n *node) client() {
-	ctx := context.Background()
+func (n *node) RequestToken(_ context.Context, request *me.TokenRequest) (*me.Response, error) {
+	n.TokenRequestChannel <- int(request.Port)
 
-	go n.broadcastElection(ctx)
+	return &me.Response{}, nil
+}
+
+func (n *node) RetrieveToken(_ context.Context, request *me.TokenMessage) (*me.Response, error) {
+	n.TokenChannel <- true
+
+	return &me.Response{}, nil
+}
+
+func (n *node) ReleaseToken(_ context.Context, request *me.TokenMessage) (*me.Response, error) {
+	if n.CoordinatorPort == n.Port {
+		n.CoordinatorToken = true
+	}
+
+	return &me.Response{}, nil
+}
+
+func (n *node) client(ctx context.Context) {
 	go n.dialServers()
+	go n.broadcastElection(ctx)
+	go n.tokenDistributer(ctx)
+	n.run(ctx)
 }
 
 func (n *node) dialServers() {
@@ -123,22 +156,27 @@ func (n *node) dialServers() {
 	}
 }
 
+func (n *node) tokenDistributer(ctx context.Context) {
+	for {
+		port := <-n.TokenRequestChannel
+
+		client := n.Clients[port]
+		client.GrantToken(ctx, &me.TokenMessage{})
+	}
+}
+
 func (n *node) broadcastElection(ctx context.Context) {
 	for {
-		<-n.Elections
+		<-n.ElectionChannel
 		n.startElection(ctx)
 	}
 }
 
 func (n *node) startElection(ctx context.Context) {
-	electionMessage := &me.ElectionMessage{
-		Port: int32(n.Port),
-	}
-
 	response := false
 	for _, client := range n.BiggerClients {
 		ctx, cancel := context.WithTimeout(ctx, time.Second)
-		_, error := client.Election(ctx, electionMessage)
+		_, error := client.Election(ctx, &me.ElectionMessage{})
 
 		if error == nil {
 			response = true
@@ -157,7 +195,53 @@ func (n *node) startElection(ctx context.Context) {
 			_, _ = client.Coordinator(ctx, coordinatorMessage)
 			cancel()
 		}
-
-		n.CoordinatorPort = int(n.Port)
 	}
+}
+
+func (n *node) run(ctx context.Context) {
+	for {
+		client, ok := n.Clients[n.CoordinatorPort]
+		if !ok {
+			log.Print("No coordinator found: Starting new election")
+			n.startElection(ctx)
+			n.sleep()
+			continue
+		}
+
+		tokenRequest := &me.TokenRequest{
+			Port: int32(n.Port),
+		}
+
+		_, error := client.RequestToken(ctx, tokenRequest)
+		if error != nil {
+			log.Print("Coordinator crashed: Starting new election")
+			n.startElection(ctx)
+			n.sleep()
+			continue
+		}
+
+		n.Token = <-n.TokenChannel
+
+		log.Print("Entering critical section")
+
+		n.criticalSection()
+
+		log.Printf("Leaving critical section")
+
+		n.Token = false
+		client.ReleaseToken(ctx, &me.TokenMessage{})
+
+		n.sleep()
+	}
+}
+
+func (n *node) sleep() {
+	wait := rand.Intn(5)
+	time.Sleep(time.Second * time.Duration(wait))
+}
+
+func (n *node) criticalSection() {
+	time.Sleep(time.Second * 3)
+	log.Printf("I am inside the critical section")
+	time.Sleep(time.Second * 3)
 }

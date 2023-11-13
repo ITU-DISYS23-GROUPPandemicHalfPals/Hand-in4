@@ -4,17 +4,24 @@ package me;
 
 option go_package = "me/me";
 
-message ElectionMessage {
-    int32 port = 1;
-}
+message ElectionMessage {}
 
 message CoordinatorMessage {
     int32 port = 1;
 }
+
+message TokenRequest {
+    int32 port = 1;
+}
+
+message TokenMessage {}
 
 message Response { }
 
 service MutualExclusion {
     rpc Election(ElectionMessage) returns (Response) {}
     rpc Coordinator(CoordinatorMessage) returns (Response) {}
+    rpc RequestToken(TokenRequest) returns (Response) {}
+    rpc GrantToken(TokenMessage) returns (Response) {}
+    rpc ReleaseToken(TokenMessage) returns (Response) {}
 }
