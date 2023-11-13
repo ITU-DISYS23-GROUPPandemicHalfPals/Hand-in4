@@ -131,7 +131,6 @@ func (n *node) startElection(ctx context.Context) {
 				}
 
 				n.CoordinatorPort = int(n.Port)
-				log.Printf("%d is coordinator", n.Port)
 			}
 		}
 	}
