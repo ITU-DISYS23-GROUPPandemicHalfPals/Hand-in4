@@ -214,7 +214,7 @@ func (n *node) run(ctx context.Context) {
 		}
 
 		println()
-		log.Printf("Requesting the token - Using Coordinator: %d", n.CoordinatorPort)
+		log.Printf("Requesting the token from coordinator: %d", n.CoordinatorPort)
 		tokenRequest := &me.TokenRequest{
 			Port: int32(n.Port),
 		}
