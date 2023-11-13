@@ -108,7 +108,7 @@ func (n *node) RequestToken(_ context.Context, request *me.TokenRequest) (*me.Re
 	return &me.Response{}, nil
 }
 
-func (n *node) RetrieveToken(_ context.Context, request *me.TokenMessage) (*me.Response, error) {
+func (n *node) GrantToken(_ context.Context, request *me.TokenMessage) (*me.Response, error) {
 	n.TokenChannel <- true
 
 	return &me.Response{}, nil
@@ -160,6 +160,11 @@ func (n *node) tokenDistributer(ctx context.Context) {
 	for {
 		port := <-n.TokenRequestChannel
 
+		for !n.CoordinatorToken {
+
+		}
+
+		n.CoordinatorToken = false
 		client := n.Clients[port]
 		client.GrantToken(ctx, &me.TokenMessage{})
 	}
@@ -222,7 +227,8 @@ func (n *node) run(ctx context.Context) {
 
 		n.Token = <-n.TokenChannel
 
-		log.Print("Entered critical section")
+		println()
+		log.Printf("Entering critical section - Coordinator: %d", n.CoordinatorPort)
 
 		n.criticalSection()
 
@@ -236,12 +242,12 @@ func (n *node) run(ctx context.Context) {
 }
 
 func (n *node) sleep() {
-	wait := rand.Intn(5)
-	time.Sleep(time.Second * time.Duration(wait))
+	wait := rand.Intn(3)
+	time.Sleep(time.Second*time.Duration(wait) + time.Second*3)
 }
 
 func (n *node) criticalSection() {
-	time.Sleep(time.Second * 5)
+	n.sleep()
 	log.Printf("Using the critical section")
-	time.Sleep(time.Second * 5)
+	n.sleep()
 }
