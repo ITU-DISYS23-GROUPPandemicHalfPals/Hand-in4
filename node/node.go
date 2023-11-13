@@ -227,7 +227,13 @@ func (n *node) run(ctx context.Context) {
 			continue
 		}
 
-		n.Token = <-n.TokenChannel
+		select {
+		case n.Token = <-n.TokenChannel:
+		case <-time.After(time.Second * 15):
+			log.Print("Token not granted: Sending new request (Coordinator might have crashed)")
+			n.sleep()
+			continue
+		}
 		log.Print("Granted token")
 
 		log.Print("Entering critical section")
