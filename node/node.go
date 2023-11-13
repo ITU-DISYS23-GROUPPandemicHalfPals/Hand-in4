@@ -95,7 +95,7 @@ func (n *node) client() {
 
 	go n.printCoordinator()
 	go n.dialServers()
-	go n.broadcaseElection(ctx)
+	go n.broadcastElection(ctx)
 	n.startElection(ctx)
 }
 
@@ -147,7 +147,7 @@ func (n *node) startElection(ctx context.Context) {
 	}
 }
 
-func (n *node) broadcaseElection(ctx context.Context) {
+func (n *node) broadcastElection(ctx context.Context) {
 	for {
 		election := <-n.Elections
 		response := false
