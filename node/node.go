@@ -250,13 +250,13 @@ func (n *node) run(ctx context.Context) {
 	}
 }
 
-func (n *node) sleep() {
-	wait := rand.Intn(3)
-	time.Sleep(time.Second*time.Duration(wait) + time.Second*3)
-}
-
 func (n *node) criticalSection() {
 	n.sleep()
 	log.Printf("Using the critical section")
 	n.sleep()
+}
+
+func (n *node) sleep() {
+	wait := rand.Intn(3)
+	time.Sleep(time.Second*time.Duration(wait) + time.Second*3)
 }
