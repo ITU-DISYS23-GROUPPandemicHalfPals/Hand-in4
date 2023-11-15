@@ -158,15 +158,12 @@ func (n *node) dialServers() {
 
 func (n *node) tokenDistributer(ctx context.Context) {
 	for {
-		port := <-n.TokenRequestChannel
-
-		for !n.CoordinatorToken {
-
+		if n.CoordinatorToken {
+			port := <-n.TokenRequestChannel
+			n.CoordinatorToken = false
+			client := n.Clients[port]
+			client.GrantToken(ctx, &me.TokenMessage{})
 		}
-
-		n.CoordinatorToken = false
-		client := n.Clients[port]
-		client.GrantToken(ctx, &me.TokenMessage{})
 	}
 }
 
